@@ -1,5 +1,5 @@
 # Octo-Reports
-## Octo-Reports is a powerful command line tool written in Go that generates comprehensive reports on your GitHub Enterprise environment. This tool is designed to help you better manage your organization, repositories, and teams by providing you with detailed and organized information about your GitHub Enterprise setup.
+ Octo-Reports is a powerful command line tool written in Go that generates comprehensive reports on your GitHub Enterprise environment. This tool is designed to help you better manage your organization, repositories, and teams by providing you with detailed and organized information about your GitHub Enterprise setup.
 
 ## Features
 Octo-Reports can generate the following reports:
