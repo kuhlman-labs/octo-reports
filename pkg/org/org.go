@@ -9,71 +9,17 @@ import (
 	"time"
 
 	"github.com/kuhlman-labs/octo-reports/internal/client"
+	"github.com/kuhlman-labs/octo-reports/pkg/enterprise"
 	"github.com/shurcooL/githubv4"
 )
-
-type Org struct {
-	Login githubv4.String
-	ID    githubv4.String
-}
 
 type Member struct {
 	Login githubv4.String
 	Role  githubv4.String
 }
 
-func getEnterpriseOrgs(enterpriseSlug, token string) []*Org {
-	client := client.NewClient(token)
-
-	variables := map[string]interface{}{
-		"enterpriseSlug": githubv4.String(enterpriseSlug),
-		"cursor":         (*githubv4.String)(nil),
-	}
-
-	var query struct {
-		Enterprise struct {
-			Organizations struct {
-				PageInfo struct {
-					EndCursor   githubv4.String
-					HasNextPage bool
-				}
-				Nodes []struct {
-					Login githubv4.String
-					ID    githubv4.String
-				}
-			} `graphql:"organizations(first: 100, after: $cursor)"`
-		} `graphql:"enterprise(slug: $enterpriseSlug)"`
-	}
-
-	allOrgs := []*Org{}
-	start := time.Now()
-	for {
-		err := client.Query(context.Background(), &query, variables)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, org := range query.Enterprise.Organizations.Nodes {
-			allOrgs = append(allOrgs, &Org{
-				Login: org.Login,
-				ID:    org.ID,
-			})
-		}
-
-		if !query.Enterprise.Organizations.PageInfo.HasNextPage {
-			break
-		}
-		variables["cursor"] = githubv4.NewString(query.Enterprise.Organizations.PageInfo.EndCursor)
-	}
-
-	log.Printf("Found %d orgs in the %s Enterprise", len(allOrgs), enterpriseSlug)
-	log.Printf("Fetched all orgs in %s", time.Since(start))
-
-	return allOrgs
-}
-
-func getOrgMembersWithRole(orgName, token string) []*Member {
-	client := client.NewClient(token)
+func getOrgMembersWithRole(orgName, token string) ([]*Member, error) {
+	client := client.NewV4Client(token)
 
 	variables := map[string]interface{}{
 		"orgName": githubv4.String(orgName),
@@ -99,6 +45,7 @@ func getOrgMembersWithRole(orgName, token string) []*Member {
 
 	allMembers := []*Member{}
 	start := time.Now()
+	log.Printf("Fetching members for %s", orgName)
 	for {
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
@@ -121,13 +68,13 @@ func getOrgMembersWithRole(orgName, token string) []*Member {
 	log.Printf("Found %d members in %s", len(allMembers), orgName)
 	log.Printf("Fetched all members in %s", time.Since(start))
 
-	return allMembers
+	return allMembers, nil
 }
 
 func GenerateMembershipReport(enterpriseSlug, token string) {
 	file, err := os.Create("orgs.csv")
 	if err != nil {
-		fmt.Println("Error creating the CSV file:", err)
+		fmt.Println("Error creating the CSV file: %w", err)
 		return
 	}
 	defer file.Close()
@@ -135,7 +82,6 @@ func GenerateMembershipReport(enterpriseSlug, token string) {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write the header row
 	header := []string{"Org Name", "Org ID", "Org Admins", "Org Members"}
 	err = writer.Write(header)
 	if err != nil {
@@ -143,10 +89,18 @@ func GenerateMembershipReport(enterpriseSlug, token string) {
 		return
 	}
 
-	orgs := getEnterpriseOrgs("GitHub", token)
+	orgs, error := enterprise.GetEnterpriseOrgs(enterpriseSlug, token)
+	if error != nil {
+		fmt.Println("Error getting orgs:", error)
+		return
+	}
 
 	for _, org := range orgs {
-		orgMembers := getOrgMembersWithRole(string(org.Login), token)
+		orgMembers, error := getOrgMembersWithRole(string(org.Login), token)
+		if error != nil {
+			fmt.Println("Error getting org members:", error)
+			return
+		}
 		var admins, members string
 		for _, member := range orgMembers {
 			if string(member.Role) == "ADMIN" {
@@ -163,5 +117,5 @@ func GenerateMembershipReport(enterpriseSlug, token string) {
 		}
 	}
 
-	fmt.Println("Successfully wrote to the CSV file")
+	log.Printf("Wrote %d records to orgs.csv", len(orgs))
 }
