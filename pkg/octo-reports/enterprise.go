@@ -1,4 +1,4 @@
-package enterprise
+package octoreports
 
 import (
 	"context"
@@ -7,23 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/kuhlman-labs/octo-reports/internal/client"
 	"github.com/shurcooL/githubv4"
 )
 
-type Org struct {
-	Login githubv4.String
-	ID    githubv4.String
-}
-
-type Member struct {
-	Id    string
-	Name  string
-	Login string
-}
-
-func GetEnterpriseOrgs(enterpriseSlug, token string) ([]*Org, error) {
-	client := client.NewV4Client(token)
+func getEnterpriseOrgs(enterpriseSlug string, client *githubv4.Client) ([]*Org, error) {
 
 	variables := map[string]interface{}{
 		"enterpriseSlug": githubv4.String(enterpriseSlug),
@@ -73,8 +60,7 @@ func GetEnterpriseOrgs(enterpriseSlug, token string) ([]*Org, error) {
 	return allOrgs, nil
 }
 
-func getEnterpriseMembers(enterpriseSlug, token string) ([]*Member, error) {
-	client := client.NewV4Client(token)
+func getEnterpriseMembers(enterpriseSlug string, client *githubv4.Client) ([]*Member, error) {
 
 	variables := map[string]interface{}{
 		"enterpriseSlug": githubv4.String(enterpriseSlug),
@@ -92,10 +78,13 @@ func getEnterpriseMembers(enterpriseSlug, token string) ([]*Member, error) {
 					EnterpriseUserAccount struct {
 						Id    string
 						Login string
-						User  struct {
-							Name string
-						}
+						Name  string
 					} `graphql:"... on EnterpriseUserAccount"`
+					User struct {
+						Id    string
+						Login string
+						Name  string
+					} `graphql:"... on User"`
 				}
 			} `graphql:"members(first: 100, after: $cursor)"`
 		} `graphql:"enterprise(slug: $enterpriseSlug)"`
@@ -103,7 +92,7 @@ func getEnterpriseMembers(enterpriseSlug, token string) ([]*Member, error) {
 
 	allMembers := []*Member{}
 	start := time.Now()
-	log.Printf("Fetching all members for %s", enterpriseSlug)
+	log.Printf("Fetching all members for the %s Enterprise.", enterpriseSlug)
 	for {
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
@@ -113,7 +102,7 @@ func getEnterpriseMembers(enterpriseSlug, token string) ([]*Member, error) {
 		for _, member := range query.Enterprise.Members.Nodes {
 			allMembers = append(allMembers, &Member{
 				Login: member.EnterpriseUserAccount.Login,
-				Name:  member.EnterpriseUserAccount.User.Name,
+				Name:  member.EnterpriseUserAccount.Name,
 				Id:    member.EnterpriseUserAccount.Id,
 			})
 		}
@@ -130,7 +119,7 @@ func getEnterpriseMembers(enterpriseSlug, token string) ([]*Member, error) {
 	return allMembers, nil
 }
 
-func GenerateEnterpriseMembershipReport(enterpriseSlug, token string) error {
+func GenerateEnterpriseMembershipReport(enterpriseSlug string, client *githubv4.Client) error {
 
 	file, err := os.Create("enterprise-membership-report.csv")
 	if err != nil {
@@ -144,7 +133,7 @@ func GenerateEnterpriseMembershipReport(enterpriseSlug, token string) error {
 
 	writer.Write([]string{"Login", "Name", "Id"})
 
-	allMembers, err := getEnterpriseMembers(enterpriseSlug, token)
+	allMembers, err := getEnterpriseMembers(enterpriseSlug, client)
 	if err != nil {
 		panic(err)
 	}

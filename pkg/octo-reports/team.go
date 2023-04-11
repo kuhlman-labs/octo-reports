@@ -1,4 +1,4 @@
-package team
+package octoreports
 
 import (
 	"context"
@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/kuhlman-labs/octo-reports/internal/client"
-	"github.com/kuhlman-labs/octo-reports/pkg/enterprise"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -18,15 +16,11 @@ type Team struct {
 	Name        string
 	Slug        string
 	Description string
+	Role        string
 	Members     []*Member
 }
 
-type Member struct {
-	Login string
-}
-
-func getOrgTeams(orgName, token string) ([]Team, error) {
-	client := client.NewV4Client(token)
+func getOrgTeams(orgName string, client *githubv4.Client) ([]Team, error) {
 
 	variables := map[string]interface{}{
 		"orgName": githubv4.String(orgName),
@@ -41,16 +35,10 @@ func getOrgTeams(orgName, token string) ([]Team, error) {
 					HasNextPage bool
 				}
 				Nodes []struct {
-					ID   string
-					Name string
-					Slug string
-					//LdapDn      string
+					ID          string
+					Name        string
+					Slug        string
 					Description string
-					//Members     struct {
-					//	Nodes []struct {
-					//		Login string
-					//	}
-					//}
 				}
 			} `graphql:"teams(first: 100, after: $cursor)"`
 		} `graphql:"organization(login : $orgName)"`
@@ -64,19 +52,10 @@ func getOrgTeams(orgName, token string) ([]Team, error) {
 		if err != nil {
 			panic(err)
 		}
-		/*
-			allMembers := []*Member{}
-
-			for _, member := range query.Organization.Teams.Nodes[0].Members.Nodes {
-				allMembers = append(allMembers, &Member{
-					Login: member.Login,
-				})
-			}
-		*/
 
 		for _, team := range query.Organization.Teams.Nodes {
 
-			allMembers, err := getTeamMembers(orgName, team.Slug, token)
+			allMembers, err := getTeamMembers(orgName, team.Slug, client)
 			if err != nil {
 				panic(err)
 			}
@@ -103,8 +82,7 @@ func getOrgTeams(orgName, token string) ([]Team, error) {
 	return allTeams, nil
 }
 
-func getTeamMembers(orgName, teamSlug, token string) ([]*Member, error) {
-	client := client.NewV4Client(token)
+func getTeamMembers(orgName, teamSlug string, client *githubv4.Client) ([]*Member, error) {
 
 	variables := map[string]interface{}{
 		"orgName":  githubv4.String(orgName),
@@ -160,7 +138,7 @@ func getTeamMembers(orgName, teamSlug, token string) ([]*Member, error) {
 
 }
 
-func GenerateTeamReport(enterpriseSlug, token string) error {
+func GenerateTeamReport(enterpriseSlug string, client *githubv4.Client) error {
 	file, err := os.Create("teams.csv")
 	if err != nil {
 		log.Println("Error creating the CSV file:", err)
@@ -179,13 +157,13 @@ func GenerateTeamReport(enterpriseSlug, token string) error {
 		return nil
 	}
 
-	orgs, err := enterprise.GetEnterpriseOrgs(enterpriseSlug, token)
+	orgs, err := getEnterpriseOrgs(enterpriseSlug, client)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, org := range orgs {
-		teams, err := getOrgTeams(string(org.Login), token)
+		teams, err := getOrgTeams(string(org.Login), client)
 		if err != nil {
 			log.Fatal(err)
 		}

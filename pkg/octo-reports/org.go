@@ -1,25 +1,28 @@
-package org
+package octoreports
 
 import (
 	"context"
 	"encoding/csv"
-	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"github.com/kuhlman-labs/octo-reports/internal/client"
-	"github.com/kuhlman-labs/octo-reports/pkg/enterprise"
 	"github.com/shurcooL/githubv4"
 )
 
-type Member struct {
+type Org struct {
 	Login githubv4.String
-	Role  githubv4.String
+	ID    githubv4.String
 }
 
-func getOrgMembersWithRole(orgName, token string) ([]*Member, error) {
-	client := client.NewV4Client(token)
+type Member struct {
+	Id    string
+	Name  string
+	Login string
+	Role  string
+}
+
+func getOrgMembersWithRole(orgName string, client *githubv4.Client) ([]*Member, error) {
 
 	variables := map[string]interface{}{
 		"orgName": githubv4.String(orgName),
@@ -34,9 +37,9 @@ func getOrgMembersWithRole(orgName, token string) ([]*Member, error) {
 					HasNextPage bool
 				}
 				Edges []struct {
-					Role githubv4.String
+					Role string
 					Node struct {
-						Login githubv4.String
+						Login string
 					}
 				}
 			} `graphql:"membersWithRole(first: 100, after: $cursor)"`
@@ -71,11 +74,10 @@ func getOrgMembersWithRole(orgName, token string) ([]*Member, error) {
 	return allMembers, nil
 }
 
-func GenerateMembershipReport(enterpriseSlug, token string) {
-	file, err := os.Create("orgs.csv")
+func GenerateOrgMembershipReport(enterpriseSlug string, client *githubv4.Client) error {
+	file, err := os.Create("enterprise-orgs-member-report.csv")
 	if err != nil {
-		fmt.Println("Error creating the CSV file: %w", err)
-		return
+		panic(err)
 	}
 	defer file.Close()
 
@@ -85,21 +87,18 @@ func GenerateMembershipReport(enterpriseSlug, token string) {
 	header := []string{"Org Name", "Org ID", "Org Admins", "Org Members"}
 	err = writer.Write(header)
 	if err != nil {
-		fmt.Println("Error writing the header row:", err)
-		return
+		panic(err)
 	}
 
-	orgs, error := enterprise.GetEnterpriseOrgs(enterpriseSlug, token)
-	if error != nil {
-		fmt.Println("Error getting orgs:", error)
-		return
+	orgs, err := getEnterpriseOrgs(enterpriseSlug, client)
+	if err != nil {
+		panic(err)
 	}
 
 	for _, org := range orgs {
-		orgMembers, error := getOrgMembersWithRole(string(org.Login), token)
-		if error != nil {
-			fmt.Println("Error getting org members:", error)
-			return
+		orgMembers, err := getOrgMembersWithRole(string(org.Login), client)
+		if err != nil {
+			panic(err)
 		}
 		var admins, members string
 		for _, member := range orgMembers {
@@ -112,10 +111,11 @@ func GenerateMembershipReport(enterpriseSlug, token string) {
 		record := []string{string(org.Login), string(org.ID), admins, members}
 		err = writer.Write(record)
 		if err != nil {
-			fmt.Println("Error writing a record to the CSV:", err)
-			return
+			panic(err)
 		}
 	}
 
 	log.Printf("Wrote %d records to orgs.csv", len(orgs))
+
+	return nil
 }
