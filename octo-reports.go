@@ -16,6 +16,7 @@ func main() {
 	teamCommand := flag.NewFlagSet("team-report", flag.ExitOnError)
 	repoCommand := flag.NewFlagSet("repo-report", flag.ExitOnError)
 	collaboratorCommand := flag.NewFlagSet("collaborator-report", flag.ExitOnError)
+	//loginCommand := flag.NewFlagSet("login", flag.ExitOnError)
 
 	// Enterprise flags
 	enterpriseSlugPointer := enterpriseCommand.String("enterprise-slug", "", "(Required) The slug of the enterprise to run the report for.")
@@ -42,6 +43,9 @@ func main() {
 	collaboratorTokenPointer := collaboratorCommand.String("token", "", "(Required) The token to use to authenticate to the GitHub Enterprise instance.")
 	collaboratorCommand.String("url", "https://api.github.com/graphql", "(Optional) The URL of the GitHub Enterprise instance, if not set it will default to the public GitHub API.")
 
+	// Login flags
+	//loginClientIdPointer := loginCommand.String("client-id", "", "(Required) The client ID of the GitHub App to use for authentication.")
+
 	if len(os.Args) < 2 {
 		log.Fatalf("Please specify a subcommand. Can be one of: enterprise-report, org-report, team-report, repo-report, collaborator-report")
 	}
@@ -57,6 +61,8 @@ func main() {
 		repoCommand.Parse(os.Args[2:])
 	case "collaborator-report":
 		collaboratorCommand.Parse(os.Args[2:])
+	//case "login":
+	//	loginCommand.Parse(os.Args[2:])
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -131,6 +137,7 @@ func main() {
 
 		url := repoCommand.Lookup("url").Value.String()
 		token := repoCommand.Lookup("token").Value.String()
+
 		enterpriseName := repoCommand.Lookup("enterprise-slug").Value.String()
 
 		client := octoreports.NewV4Client(url, token)
@@ -156,5 +163,27 @@ func main() {
 
 		octoreports.GenerateCollaboratorReport(org, client)
 	}
+	// TODO: Implement login once Enterprise Apps are GA
+	/*
+		if loginCommand.Parsed() {
+			if *loginClientIdPointer == "" {
+				loginCommand.PrintDefaults()
+				log.Fatalf("client-id is required")
+			}
 
+			clientId := loginCommand.Lookup("client-id").Value.String()
+
+			// Oauth Login
+			token, err := octoreports.RequestCode("https://github.com", clientId)
+			if err != nil {
+				panic(err)
+			}
+			//write token to file
+			err = os.WriteFile("token.txt", []byte(token), 0644)
+			if err != nil {
+				panic(err)
+			}
+
+		}
+	*/
 }

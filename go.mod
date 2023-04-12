@@ -3,6 +3,7 @@ module github.com/kuhlman-labs/octo-reports
 go 1.20
 
 require (
+	github.com/cli/oauth v1.0.1
 	github.com/google/go-github/v50 v50.2.0
 	github.com/shurcooL/githubv4 v0.0.0-20230305132112-efb623903184
 	golang.org/x/oauth2 v0.6.0
