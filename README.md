@@ -9,6 +9,7 @@ Octo-Reports can generate the following reports:
 * Team Report: List out all teams in each organization in a GitHub Enterprise environment and their members.
 * Repository Report: List out all repositories contained in a GitHub Enterprise environment and gathers information about each repository.
 * Collaborator Report: List out all collaborators for each repository in a GitHub Enterprise organization.
+* Package Report: List out all packages in a GitHub Enterprise organization.
 
 ## Installation
 To install Octo-Reports, make sure you have the Go programming language installed on your system. You can download and install Go from the [official website](https://go.dev/doc/install).
@@ -59,6 +60,12 @@ octo-reports team-report -enterprise-slug <your_enterprise_slug> -token <your_gi
 
 ```bash
 octo-reports collaborator-report -org <your_organization_id> -token <your_github_pat>
+```
+
+### Generate a Package Report
+
+```bash
+octo-reports package-report -org <your_organization_id> -token <your_github_pat>
 ```
 
 ### Optional Flags

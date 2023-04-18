@@ -16,6 +16,7 @@ func main() {
 	teamCommand := flag.NewFlagSet("team-report", flag.ExitOnError)
 	repoCommand := flag.NewFlagSet("repo-report", flag.ExitOnError)
 	collaboratorCommand := flag.NewFlagSet("collaborator-report", flag.ExitOnError)
+	packageCommand := flag.NewFlagSet("package-report", flag.ExitOnError)
 	//loginCommand := flag.NewFlagSet("login", flag.ExitOnError)
 
 	// Enterprise flags
@@ -43,6 +44,11 @@ func main() {
 	collaboratorTokenPointer := collaboratorCommand.String("token", "", "(Required) The token to use to authenticate to the GitHub Enterprise instance.")
 	collaboratorCommand.String("url", "https://api.github.com/graphql", "(Optional) The URL of the GitHub Enterprise instance, if not set it will default to the public GitHub API.")
 
+	// Package flags
+	packageOrgPointer := packageCommand.String("org", "", "(Required) The login of the organization to run the report for.")
+	packageTokenPointer := packageCommand.String("token", "", "(Required) The token to use to authenticate to the GitHub Enterprise instance.")
+	packageCommand.String("url", "https://api.github.com/graphql", "(Optional) The URL of the GitHub Enterprise instance, if not set it will default to the public GitHub API.")
+
 	// Login flags
 	//loginClientIdPointer := loginCommand.String("client-id", "", "(Required) The client ID of the GitHub App to use for authentication.")
 
@@ -61,6 +67,8 @@ func main() {
 		repoCommand.Parse(os.Args[2:])
 	case "collaborator-report":
 		collaboratorCommand.Parse(os.Args[2:])
+	case "package-report":
+		packageCommand.Parse(os.Args[2:])
 	//case "login":
 	//	loginCommand.Parse(os.Args[2:])
 	default:
@@ -162,6 +170,25 @@ func main() {
 		client := octoreports.NewV4Client(url, token)
 
 		octoreports.GenerateCollaboratorReport(org, client)
+	}
+
+	if packageCommand.Parsed() {
+		if *packageOrgPointer == "" {
+			packageCommand.PrintDefaults()
+			log.Fatalf("org is required")
+		}
+		if *packageTokenPointer == "" {
+			packageCommand.PrintDefaults()
+			log.Fatalf("token is required")
+		}
+
+		url := packageCommand.Lookup("url").Value.String()
+		token := packageCommand.Lookup("token").Value.String()
+		org := packageCommand.Lookup("org").Value.String()
+
+		client := octoreports.NewV4Client(url, token)
+
+		octoreports.GenerateOrgPackageReport(org, client)
 	}
 	// TODO: Implement login once Enterprise Apps are GA
 	/*
