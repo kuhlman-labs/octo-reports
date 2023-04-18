@@ -46,9 +46,10 @@ func getPackages(orgName string, client *githubv4.Client) ([]*Package, error) {
 			panic(err)
 		}
 
-		for _, edge := range query.Organization.Packages.Nodes {
+		for _, node := range query.Organization.Packages.Nodes {
 			allPackages = append(allPackages, &Package{
-				Name: edge.Name,
+				Name:       node.Name,
+				Repository: node.Repository,
 			})
 		}
 
