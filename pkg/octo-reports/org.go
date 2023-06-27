@@ -44,6 +44,7 @@ func getOrgMembersWithRole(orgName string, client *githubv4.Client) ([]*Member, 
 				}
 			} `graphql:"membersWithRole(first: 100, after: $cursor)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allMembers := []*Member{}
@@ -53,6 +54,12 @@ func getOrgMembersWithRole(orgName string, client *githubv4.Client) ([]*Member, 
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
 		}
 
 		for _, edge := range query.Organization.MembersWithRole.Edges {

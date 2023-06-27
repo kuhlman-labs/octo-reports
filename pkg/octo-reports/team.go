@@ -42,6 +42,7 @@ func getOrgTeams(orgName string, client *githubv4.Client) ([]Team, error) {
 				}
 			} `graphql:"teams(first: 100, after: $cursor)"`
 		} `graphql:"organization(login : $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allTeams := []Team{}
@@ -51,6 +52,12 @@ func getOrgTeams(orgName string, client *githubv4.Client) ([]Team, error) {
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit remaining: %d", query.RateLimit.Remaining)
+			time.Sleep(time.Minute)
 		}
 
 		for _, team := range query.Organization.Teams.Nodes {
@@ -106,6 +113,7 @@ func getTeamMembers(orgName, teamSlug string, client *githubv4.Client) ([]*Membe
 				}
 			} `graphql:"teams(first: 1, query: $teamSlug)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allMembers := []*Member{}
@@ -115,6 +123,12 @@ func getTeamMembers(orgName, teamSlug string, client *githubv4.Client) ([]*Membe
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit remaining: %d", query.RateLimit.Remaining)
+			time.Sleep(time.Minute)
 		}
 
 		for _, member := range query.Organization.Teams.Nodes[0].Members.Nodes {

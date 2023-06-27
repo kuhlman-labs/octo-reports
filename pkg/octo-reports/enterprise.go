@@ -88,6 +88,7 @@ func getEnterpriseMembers(enterpriseSlug string, client *githubv4.Client) ([]*Me
 				}
 			} `graphql:"members(first: 100, after: $cursor)"`
 		} `graphql:"enterprise(slug: $enterpriseSlug)"`
+		RateLimit RateLimit
 	}
 
 	allMembers := []*Member{}
@@ -97,6 +98,12 @@ func getEnterpriseMembers(enterpriseSlug string, client *githubv4.Client) ([]*Me
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
 		}
 
 		for _, member := range query.Enterprise.Members.Nodes {

@@ -35,6 +35,7 @@ func getPackages(orgName string, client *githubv4.Client) ([]*Package, error) {
 				Nodes []Package
 			} `graphql:"packages(first: 100, after: $cursor)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allPackages := []*Package{}
@@ -44,6 +45,12 @@ func getPackages(orgName string, client *githubv4.Client) ([]*Package, error) {
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
 		}
 
 		for _, node := range query.Organization.Packages.Nodes {

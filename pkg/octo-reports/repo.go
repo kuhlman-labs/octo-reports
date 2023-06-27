@@ -75,6 +75,7 @@ func getOrgRepos(orgName string, getTeams bool, client *githubv4.Client) ([]*Rep
 				}
 			} `graphql:"repositories(first: 100, after: $cursor)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allRepos := []*Repo{}
@@ -85,6 +86,13 @@ func getOrgRepos(orgName string, getTeams bool, client *githubv4.Client) ([]*Rep
 		if err != nil {
 			panic(err)
 		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
+		}
+
 		for _, repo := range query.Organization.Repositories.Nodes {
 
 			if getTeams {
@@ -169,6 +177,7 @@ func getTeamsRoleForRepo(orgName, repoName string, client githubv4.Client) ([]Te
 				}
 			} `graphql:"teams(first: 100, after: $cursor)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allTeams := []Team{}
@@ -178,6 +187,12 @@ func getTeamsRoleForRepo(orgName, repoName string, client githubv4.Client) ([]Te
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
 		}
 
 		for _, team := range query.Organization.Teams.Nodes {
@@ -289,6 +304,7 @@ func getRepoCollaborators(orgName, repoName string, client *githubv4.Client) ([]
 				} `graphql:"collaborators(affiliation: ALL, first: 100, after: $cursor)"`
 			} `graphql:"repository(name: $repoName)"`
 		} `graphql:"organization(login: $orgName)"`
+		RateLimit RateLimit
 	}
 
 	allCollaborators := []*Collaborator{}
@@ -299,6 +315,12 @@ func getRepoCollaborators(orgName, repoName string, client *githubv4.Client) ([]
 		err := client.Query(context.Background(), &query, variables)
 		if err != nil {
 			panic(err)
+		}
+
+		// check rate limit
+		if query.RateLimit.Remaining < 100 {
+			log.Printf("Rate limit: %d/%d, resets at: %s", query.RateLimit.Remaining, query.RateLimit.Limit, query.RateLimit.ResetAt)
+			time.Sleep(time.Until(query.RateLimit.ResetAt.Time))
 		}
 
 		for _, collaborator := range query.Organization.Repository.Collaborators.Edges {
