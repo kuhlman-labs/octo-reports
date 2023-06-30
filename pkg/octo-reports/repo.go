@@ -12,16 +12,29 @@ import (
 )
 
 type Repo struct {
-	Name       string
-	Visibility string
-	IsArchived bool
-	IsFork     bool
-	ID         string
-	PushedAt   time.Time
-	CreatedAt  time.Time
-	Owner      string
-	Topics     []string
-	Teams      []Team
+	Name             string
+	URL              string
+	SSHURL           string
+	PrimaryLanguage  string
+	DiskUsage        int
+	IsPrivate        bool
+	HasIssuesEnabled bool
+	HasProjects      bool
+	HasWikiEnabled   bool
+	StarGazerCount   int
+	Watchers         int
+	ForkCount        int
+	OpenIssues       int
+	Visibility       string
+	IsArchived       bool
+	IsFork           bool
+	ID               string
+	PushedAt         time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	Owner            string
+	Topics           []string
+	Teams            []Team
 }
 
 type Collaborator struct {
@@ -55,13 +68,32 @@ func getOrgRepos(orgName string, getTeams bool, client *githubv4.Client) ([]*Rep
 					HasNextPage bool
 				}
 				Nodes []struct {
-					Name             string
+					Name            string
+					URL             string
+					SSHURL          string
+					PrimaryLanguage struct {
+						Name string
+					}
+					DiskUsage        int
 					Visibility       string
 					IsArchived       bool
+					IsPrivate        bool
 					IsFork           bool
 					ID               string
+					HasIssuesEnabled bool
+					HasProjects      bool
+					HasWikiEnabled   bool
+					StarGazerCount   int
+					Watchers         struct {
+						TotalCount int
+					}
+					ForkCount int
+					Issues    struct {
+						TotalCount int
+					} `graphql:"issues(states: OPEN)"`
 					PushedAt         time.Time
 					CreatedAt        time.Time
+					UpdatedAt        time.Time
 					RepositoryTopics struct {
 						Nodes []struct {
 							Topic struct {
@@ -105,16 +137,29 @@ func getOrgRepos(orgName string, getTeams bool, client *githubv4.Client) ([]*Rep
 				}
 
 				allRepos = append(allRepos, &Repo{
-					Name:       repo.Name,
-					Visibility: repo.Visibility,
-					IsArchived: repo.IsArchived,
-					IsFork:     repo.IsFork,
-					ID:         repo.ID,
-					PushedAt:   repo.PushedAt,
-					CreatedAt:  repo.CreatedAt,
-					Owner:      repo.Owner.Login,
-					Topics:     topics,
-					Teams:      teams,
+					Name:             repo.Name,
+					Visibility:       repo.Visibility,
+					IsArchived:       repo.IsArchived,
+					IsFork:           repo.IsFork,
+					ID:               repo.ID,
+					PushedAt:         repo.PushedAt,
+					CreatedAt:        repo.CreatedAt,
+					Owner:            repo.Owner.Login,
+					Topics:           topics,
+					Teams:            teams,
+					URL:              repo.URL,
+					SSHURL:           repo.SSHURL,
+					PrimaryLanguage:  repo.PrimaryLanguage.Name,
+					DiskUsage:        repo.DiskUsage,
+					IsPrivate:        repo.IsPrivate,
+					HasIssuesEnabled: repo.HasIssuesEnabled,
+					HasProjects:      repo.HasProjects,
+					HasWikiEnabled:   repo.HasWikiEnabled,
+					StarGazerCount:   repo.StarGazerCount,
+					Watchers:         repo.Watchers.TotalCount,
+					ForkCount:        repo.ForkCount,
+					OpenIssues:       repo.Issues.TotalCount,
+					UpdatedAt:        repo.UpdatedAt,
 				})
 			} else {
 				topics := []string{}
@@ -123,15 +168,28 @@ func getOrgRepos(orgName string, getTeams bool, client *githubv4.Client) ([]*Rep
 				}
 
 				allRepos = append(allRepos, &Repo{
-					Name:       repo.Name,
-					Visibility: repo.Visibility,
-					IsArchived: repo.IsArchived,
-					IsFork:     repo.IsFork,
-					ID:         repo.ID,
-					PushedAt:   repo.PushedAt,
-					CreatedAt:  repo.CreatedAt,
-					Owner:      repo.Owner.Login,
-					Topics:     topics,
+					Name:             repo.Name,
+					Visibility:       repo.Visibility,
+					IsArchived:       repo.IsArchived,
+					IsFork:           repo.IsFork,
+					ID:               repo.ID,
+					PushedAt:         repo.PushedAt,
+					CreatedAt:        repo.CreatedAt,
+					Owner:            repo.Owner.Login,
+					Topics:           topics,
+					URL:              repo.URL,
+					SSHURL:           repo.SSHURL,
+					PrimaryLanguage:  repo.PrimaryLanguage.Name,
+					DiskUsage:        repo.DiskUsage,
+					IsPrivate:        repo.IsPrivate,
+					HasIssuesEnabled: repo.HasIssuesEnabled,
+					HasProjects:      repo.HasProjects,
+					HasWikiEnabled:   repo.HasWikiEnabled,
+					StarGazerCount:   repo.StarGazerCount,
+					Watchers:         repo.Watchers.TotalCount,
+					ForkCount:        repo.ForkCount,
+					OpenIssues:       repo.Issues.TotalCount,
+					UpdatedAt:        repo.UpdatedAt,
 				})
 			}
 		}
@@ -229,7 +287,7 @@ func GenerateRepoReport(enterpriseSlug string, client *githubv4.Client) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	header := []string{"id", "owner", "name", "visibility", "archived", "is_fork", "created_at", "pushed_at", "teams", "topics"}
+	header := []string{"id", "owner", "name", "visibility", "archived", "is_fork", "created_at", "pushed_at", "teams", "topics", "url", "ssh_url", "primary_language", "disk_usage", "is_private", "has_issues", "has_projects", "has_wiki", "stargazers", "watchers", "forks", "open_issues", "updated_at", "age_in_months", "months_of_inactivity"}
 
 	err = writer.Write(header)
 	if err != nil {
@@ -251,6 +309,9 @@ func GenerateRepoReport(enterpriseSlug string, client *githubv4.Client) error {
 				teams = append(teams, team.Name+":"+team.Role)
 			}
 
+			ageInMonths := int(time.Since(repo.CreatedAt).Hours() / 24 / 30)
+			monthsOfInactivity := int(time.Since(repo.PushedAt).Hours() / 24 / 30)
+
 			record := []string{
 				repo.ID,
 				string(repo.Owner),
@@ -262,6 +323,21 @@ func GenerateRepoReport(enterpriseSlug string, client *githubv4.Client) error {
 				repo.PushedAt.Format(time.RFC3339),
 				fmt.Sprintf("%v", teams),
 				fmt.Sprintf("%v", repo.Topics),
+				repo.URL,
+				repo.SSHURL,
+				repo.PrimaryLanguage,
+				fmt.Sprintf("%d", repo.DiskUsage),
+				fmt.Sprintf("%t", repo.IsPrivate),
+				fmt.Sprintf("%t", repo.HasIssuesEnabled),
+				fmt.Sprintf("%t", repo.HasProjects),
+				fmt.Sprintf("%t", repo.HasWikiEnabled),
+				fmt.Sprintf("%d", repo.StarGazerCount),
+				fmt.Sprintf("%d", repo.Watchers),
+				fmt.Sprintf("%d", repo.ForkCount),
+				fmt.Sprintf("%d", repo.OpenIssues),
+				repo.UpdatedAt.Format(time.RFC3339),
+				fmt.Sprintf("%d", ageInMonths),
+				fmt.Sprintf("%d", monthsOfInactivity),
 			}
 
 			err := writer.Write(record)
